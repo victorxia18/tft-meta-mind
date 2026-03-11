@@ -271,6 +271,7 @@ def daily_pipeline(
         "scrape": None,
         "documents": None,
         "ingestion": None,
+        "youtube": None,
         "cleanup": None,
     }
 
@@ -278,7 +279,7 @@ def daily_pipeline(
 
     # ── Scrape ──
     if not ingest_only:
-        logger.info("[1/4] Scraping tactics.tools...")
+        logger.info("[1/5] Scraping tactics.tools...")
         scrape_result = _step_scrape()
         results["scrape"] = scrape_result
         scrape_path = scrape_result.get("path")
@@ -297,11 +298,11 @@ def daily_pipeline(
             _print_summary(results, duration)
             return results
     else:
-        logger.info("[1/4] Scraping skipped (--ingest-only)")
+        logger.info("[1/5] Scraping skipped (--ingest-only)")
 
     # ── Generate + Ingest ──
-    logger.info("[2/4] Generating documents...")
-    logger.info("[3/4] Ingesting into ChromaDB...")
+    logger.info("[2/5] Generating documents...")
+    logger.info("[3/5] Ingesting into ChromaDB...")
     ingest_result = _step_generate_and_ingest(scrape_path=scrape_path)
     results["documents"] = {
         "success": ingest_result["docs_generated"] > 0,
@@ -313,6 +314,21 @@ def daily_pipeline(
         "error": ingest_result["error"],
     }
 
+    # ── YouTube ingestion ──
+    logger.info("[4/5] Ingesting YouTube videos...")
+    youtube_file = Path("config/youtube_sources.txt")
+    youtube_urls = _read_youtube_file(str(youtube_file)) if youtube_file.exists() else []
+    if youtube_urls:
+        try:
+            youtube_result = _ingest_youtube_urls(youtube_urls)
+            results["youtube"] = youtube_result
+        except Exception as exc:
+            logger.error("YouTube ingestion failed: %s", exc, exc_info=True)
+            results["youtube"] = {"success": False, "processed": 0, "skipped": 0, "error": str(exc)}
+    else:
+        logger.info("No YouTube URLs found in %s — skipping", youtube_file)
+        results["youtube"] = {"success": True, "processed": 0, "skipped": 0, "error": None}
+
     # If ingestion failed, skip cleanup to preserve the scrape file
     if not ingest_result["success"]:
         logger.warning(
@@ -320,7 +336,7 @@ def daily_pipeline(
         )
     else:
         # ── Cleanup ──
-        logger.info("[4/4] Cleaning up old files...")
+        logger.info("[5/5] Cleaning up old files...")
         cleanup_result = _step_cleanup()
         results["cleanup"] = cleanup_result
 
@@ -374,6 +390,18 @@ def _print_summary(results: dict, duration: float):
         lines.append(f"Ingestion: ✓ ({ingestion['total_chunks']} total chunks in knowledge base)")
     else:
         lines.append(f"Ingestion: ✗ ({ingestion['error']})")
+
+    # YouTube
+    youtube = results.get("youtube")
+    if youtube is None:
+        lines.append("YouTube: — (skipped)")
+    elif youtube.get("error"):
+        lines.append(f"YouTube: ✗ ({youtube['error']})")
+    else:
+        lines.append(
+            f"YouTube: ✓ ({youtube.get('processed', 0)} ingested, "
+            f"{youtube.get('skipped', 0)} skipped)"
+        )
 
     # Cleanup
     cleanup = results.get("cleanup")
@@ -475,38 +503,77 @@ def _read_youtube_file(filepath: str) -> list[str]:
     return urls
 
 
-def _ingest_youtube_urls(urls: list[str]):
-    """Fetch, process, and ingest YouTube videos into the knowledge base."""
+def _ingest_youtube_urls(urls: list[str]) -> dict:
+    """Fetch, process, and ingest YouTube videos into the knowledge base.
+
+    Skips videos already tracked in data/youtube_videos.json to avoid
+    wasting Gemini API tokens on duplicates.
+
+    Returns:
+        {"success": bool, "processed": int, "skipped": int, "error": str|None}
+    """
     import os
+    import re
     import time as _time
 
     from dotenv import load_dotenv
     load_dotenv()
 
+    result = {"success": False, "processed": 0, "skipped": 0, "error": None}
+
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        print("Error: GEMINI_API_KEY not found in .env file.")
-        return
+        result["error"] = "GEMINI_API_KEY not found in .env file"
+        logger.error(result["error"])
+        return result
 
-    from scraper.youtube import TFTYouTubeScraper, ingest_youtube_video
+    from scraper.youtube import (
+        TFTYouTubeScraper,
+        ingest_youtube_video,
+        load_youtube_videos,
+        _extract_video_id,
+    )
+
+    # Build set of already-ingested video IDs for duplicate detection
+    existing_ids = {v.get("video_id") for v in load_youtube_videos()}
 
     scraper = TFTYouTubeScraper(gemini_api_key=api_key)
     total = len(urls)
 
     for i, url in enumerate(urls, 1):
-        print(f"\n[{i}/{total}] Processing: {url}")
-        result = ingest_youtube_video(url, scraper)
+        # Check for duplicate before calling Gemini
+        try:
+            video_id = _extract_video_id(url)
+        except Exception:
+            video_id = None
 
-        if result["success"]:
-            print(f"  Ingested: {result['title']}")
+        if video_id and video_id in existing_ids:
+            logger.info("[%d/%d] Skipping already-ingested video: %s", i, total, video_id)
+            result["skipped"] += 1
+            continue
+
+        logger.info("[%d/%d] Processing: %s", i, total, url)
+        ingest_result = ingest_youtube_video(url, scraper)
+
+        if ingest_result["success"]:
+            logger.info("  Ingested: %s", ingest_result["title"])
+            result["processed"] += 1
+            # Add to existing set so later duplicates in the same file are caught
+            if ingest_result.get("video_id"):
+                existing_ids.add(ingest_result["video_id"])
         else:
-            print(f"  Failed: {result['error']}")
+            logger.warning("  Failed: %s", ingest_result["error"])
 
         # Rate limit between videos
         if i < total:
             _time.sleep(3)
 
-    print(f"\nDone — processed {total} video(s).")
+    result["success"] = True
+    logger.info(
+        "YouTube ingestion done — %d processed, %d skipped",
+        result["processed"], result["skipped"],
+    )
+    return result
 
 
 def _run_scheduled():
