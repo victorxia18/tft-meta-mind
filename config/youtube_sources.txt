@@ -1,0 +1,7 @@
+# YouTube URLs for TFT Meta Mind daily ingestion
+# One URL per line. Lines starting with # are ignored.
+# Add TFT content creator videos here to ingest into the knowledge base.
+#
+# Examples:
+# https://www.youtube.com/watch?v=XXXXXXXXXXX
+https://www.youtube.com/watch?v=CXuCH4nlsxY
