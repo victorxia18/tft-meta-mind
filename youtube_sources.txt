@@ -1,0 +1,9 @@
+# TFT Meta Mind — YouTube Sources
+# Add one YouTube URL per line
+# Lines starting with # are ignored
+# Blank lines are also ignored
+#
+# Recommended channels to watch for meta guides:
+# - Search for "[current set name] tier list" or "[current set name] patch guide"
+#
+https://www.youtube.com/watch?v=CXuCH4nlsxY
