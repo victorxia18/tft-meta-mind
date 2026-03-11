@@ -124,6 +124,50 @@ if st.sidebar.button("Re-ingest Data"):
     reingest_data()
     st.rerun()
 
+# ── YouTube video ingestion ─────────────────────────────
+st.sidebar.markdown("---")
+st.sidebar.subheader("Add YouTube Video")
+
+youtube_url = st.sidebar.text_input(
+    "YouTube URL",
+    placeholder="Paste YouTube URL...",
+    label_visibility="collapsed",
+)
+
+if st.sidebar.button("Ingest Video"):
+    if youtube_url.strip():
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            st.sidebar.error("GEMINI_API_KEY not set in .env")
+        else:
+            with st.sidebar:
+                with st.spinner("Processing video transcript..."):
+                    try:
+                        from scraper.youtube import TFTYouTubeScraper, ingest_youtube_video
+                        scraper = TFTYouTubeScraper(gemini_api_key=api_key)
+                        result = ingest_youtube_video(youtube_url, scraper)
+
+                        if result["success"]:
+                            st.success(f"Ingested: {result['title']}")
+                            st.rerun()
+                        else:
+                            st.error(f"Failed: {result['error']}")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+    else:
+        st.sidebar.warning("Please paste a YouTube URL first.")
+
+# Show ingested videos
+from scraper.youtube import load_youtube_videos
+ingested_videos = load_youtube_videos()
+if ingested_videos:
+    st.sidebar.markdown(f"**Ingested Videos ({len(ingested_videos)})**")
+    for vid in ingested_videos:
+        st.sidebar.caption(
+            f"[{vid.get('title', vid.get('video_id', '?'))}]({vid.get('url', '')})\n"
+            f"{vid.get('channel', '')} \u2022 {vid.get('date_ingested', '')}"
+        )
+
 # ── Check prerequisites ─────────────────────────────────
 
 bot = init_chatbot()

@@ -1,0 +1,40 @@
+services:
+  streamlit:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file: .env
+    volumes:
+      - chroma_data:/app/chroma_db
+      - scrape_data:/app/data/raw
+      - log_data:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  pipeline:
+    build: .
+    command: ["python", "-m", "pipeline.daily_run", "--schedule"]
+    env_file: .env
+    volumes:
+      - chroma_data:/app/chroma_db
+      - scrape_data:/app/data/raw
+      - log_data:/app/logs
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+  scrape_data:
+  log_data:
