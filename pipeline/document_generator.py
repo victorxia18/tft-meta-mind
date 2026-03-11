@@ -293,6 +293,36 @@ class TFTDocumentGenerator:
         }
 
 
+    def generate_youtube_document(self, processed_video: dict) -> dict:
+        """Wrap a Gemini-processed YouTube transcript into a RAG document.
+
+        Args:
+            processed_video: Output from TFTYouTubeScraper.process_transcript_for_rag().
+                             Has "text" (extracted advice) and "metadata" dict.
+
+        Returns:
+            {"text": str, "metadata": dict} for RAG ingestion.
+        """
+        meta = processed_video.get("metadata", {})
+        title = meta.get("video_title", "Unknown Video")
+        channel = meta.get("channel", "Unknown Channel")
+        date = meta.get("date", "unknown")
+        video_url = meta.get("video_url", "")
+
+        header = (
+            f"# TFT Video Guide — {title}\n"
+            f"Channel: {channel} | Date: {date}\n"
+            f"Source: {video_url}\n\n"
+        )
+
+        text = header + processed_video.get("text", "")
+
+        return {
+            "text": text,
+            "metadata": meta,
+        }
+
+
 if __name__ == "__main__":
     import sys
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

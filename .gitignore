@@ -2,6 +2,8 @@
 .claude/
 chroma_db/
 data/raw/
+data/youtube_videos.json
+logs/
 __pycache__/
 .venv/
 *.pyc
