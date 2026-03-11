@@ -1,0 +1,30 @@
+name: Deploy to Lightsail
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.LIGHTSAIL_IP }}
+          username: ubuntu
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          script: |
+            cd ~/tft-project
+            git pull origin master
+
+            # Write .env from secrets
+            cat > .env << 'ENVEOF'
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            ENVEOF
+
+            # Build and deploy
+            docker compose up -d --build --remove-orphans
+
+            # Clean up dangling images
+            docker image prune -f
