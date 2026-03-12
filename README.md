@@ -4,7 +4,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Deployed](https://img.shields.io/badge/status-deployed-brightgreen)](https://github.com/victorxia18/tft-meta-mind)
+[![Deployed](https://img.shields.io/badge/status-deployed-brightgreen)](https://tftmetamind.duckdns.org)
 
 ![TFT Meta Mind Screenshot](docs/screenshot.png)
 <!-- TODO: Add actual screenshot -->
