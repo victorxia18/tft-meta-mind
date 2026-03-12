@@ -126,15 +126,18 @@ if st.sidebar.button("Re-ingest Data"):
 
 # ── Ingested YouTube videos ─────────────────────────────
 st.sidebar.markdown("---")
-from scraper.youtube import load_youtube_videos
-ingested_videos = load_youtube_videos()
-if ingested_videos:
-    st.sidebar.markdown(f"**Ingested Videos ({len(ingested_videos)})**")
-    for vid in ingested_videos:
-        st.sidebar.caption(
-            f"[{vid.get('title', vid.get('video_id', '?'))}]({vid.get('url', '')})\n"
-            f"{vid.get('channel', '')} \u2022 {vid.get('date_ingested', '')}"
-        )
+youtube_docs_dir = Path("data/youtube_docs")
+youtube_doc_files = sorted(youtube_docs_dir.glob("*.json")) if youtube_docs_dir.exists() else []
+if youtube_doc_files:
+    st.sidebar.markdown(f"**Ingested Videos ({len(youtube_doc_files)})**")
+    for doc_path in youtube_doc_files:
+        doc = json.load(open(doc_path, encoding="utf-8"))
+        meta = doc.get("metadata", {})
+        video_id = doc_path.stem
+        title = meta.get("video_title", video_id)
+        channel = meta.get("channel", "")
+        url = meta.get("video_url", f"https://www.youtube.com/watch?v={video_id}")
+        st.sidebar.caption(f"[{title}]({url})\n{channel}")
 
 # ── Check prerequisites ─────────────────────────────────
 
