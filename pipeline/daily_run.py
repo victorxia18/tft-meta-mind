@@ -241,6 +241,51 @@ def _step_cleanup() -> dict:
     return result
 
 
+# ── Step: Ingest YouTube document files ───────────────────
+
+YOUTUBE_DOCS_DIR = Path("data/youtube_docs")
+
+
+def _step_ingest_youtube_docs() -> dict:
+    """Ingest pre-processed YouTube document JSONs into ChromaDB.
+
+    Documents are created locally (where YouTube isn't IP-blocked) and
+    committed to data/youtube_docs/.  This step picks them up and ingests
+    into the vector store.
+
+    Returns:
+        {"success": bool, "ingested": int, "error": str|None}
+    """
+    from rag.vector_store import TFTVectorStore
+
+    result = {"success": True, "ingested": 0, "error": None}
+
+    if not YOUTUBE_DOCS_DIR.exists():
+        logger.info("No YouTube docs directory found — skipping")
+        return result
+
+    doc_files = list(YOUTUBE_DOCS_DIR.glob("*.json"))
+    if not doc_files:
+        logger.info("No YouTube document files to ingest")
+        return result
+
+    try:
+        store = TFTVectorStore()
+        for doc_path in doc_files:
+            document = json.loads(doc_path.read_text(encoding="utf-8"))
+            store.ingest_document(document)
+            logger.info("Ingested YouTube doc: %s", doc_path.name)
+            result["ingested"] += 1
+
+        logger.info("YouTube doc ingestion complete — %d document(s)", result["ingested"])
+    except Exception as exc:
+        result["success"] = False
+        result["error"] = str(exc)
+        logger.error("YouTube doc ingestion failed: %s", exc, exc_info=True)
+
+    return result
+
+
 # ── Main pipeline function ───────────────────────────────────
 
 def daily_pipeline(
@@ -314,20 +359,9 @@ def daily_pipeline(
         "error": ingest_result["error"],
     }
 
-    # ── YouTube ingestion ──
-    logger.info("[4/5] Ingesting YouTube videos...")
-    youtube_file = Path("config/youtube_sources.txt")
-    youtube_urls = _read_youtube_file(str(youtube_file)) if youtube_file.exists() else []
-    if youtube_urls:
-        try:
-            youtube_result = _ingest_youtube_urls(youtube_urls)
-            results["youtube"] = youtube_result
-        except Exception as exc:
-            logger.error("YouTube ingestion failed: %s", exc, exc_info=True)
-            results["youtube"] = {"success": False, "processed": 0, "skipped": 0, "error": str(exc)}
-    else:
-        logger.info("No YouTube URLs found in %s — skipping", youtube_file)
-        results["youtube"] = {"success": True, "processed": 0, "skipped": 0, "error": None}
+    # ── YouTube doc ingestion ──
+    logger.info("[4/5] Ingesting YouTube documents...")
+    results["youtube"] = _step_ingest_youtube_docs()
 
     # If ingestion failed, skip cleanup to preserve the scrape file
     if not ingest_result["success"]:
@@ -398,10 +432,7 @@ def _print_summary(results: dict, duration: float):
     elif youtube.get("error"):
         lines.append(f"YouTube: ✗ ({youtube['error']})")
     else:
-        lines.append(
-            f"YouTube: ✓ ({youtube.get('processed', 0)} ingested, "
-            f"{youtube.get('skipped', 0)} skipped)"
-        )
+        lines.append(f"YouTube: ✓ ({youtube.get('ingested', 0)} document(s) ingested)")
 
     # Cleanup
     cleanup = results.get("cleanup")
