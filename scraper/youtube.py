@@ -288,14 +288,20 @@ def save_youtube_video(entry: dict):
     )
 
 
+YOUTUBE_DOCS_DIR = Path("data/youtube_docs")
+
+
 def ingest_youtube_video(video_url: str, scraper: TFTYouTubeScraper) -> dict:
-    """Full pipeline: fetch transcript, process with Gemini, ingest into ChromaDB.
+    """Fetch transcript, process with Gemini, and save document JSON to disk.
+
+    The document is saved to data/youtube_docs/ for later ingestion into
+    ChromaDB by the daily pipeline (which runs on Lightsail where YouTube
+    transcripts can't be fetched due to IP blocking).
 
     Returns:
         {"success": bool, "video_id": str, "title": str, "error": str|None}
     """
     from pipeline.document_generator import TFTDocumentGenerator
-    from rag.vector_store import TFTVectorStore
 
     result = {"success": False, "video_id": "", "title": "", "error": None}
 
@@ -315,9 +321,13 @@ def ingest_youtube_video(video_url: str, scraper: TFTYouTubeScraper) -> dict:
         gen = TFTDocumentGenerator()
         document = gen.generate_youtube_document(processed)
 
-        # Ingest into ChromaDB
-        store = TFTVectorStore()
-        store.ingest_document(document)
+        # Save document JSON to disk for later ingestion on Lightsail
+        YOUTUBE_DOCS_DIR.mkdir(parents=True, exist_ok=True)
+        doc_path = YOUTUBE_DOCS_DIR / f"{video_id}.json"
+        doc_path.write_text(
+            json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        logger.info("Saved document to %s", doc_path)
 
         # Track the ingested video
         save_youtube_video({
@@ -330,11 +340,11 @@ def ingest_youtube_video(video_url: str, scraper: TFTYouTubeScraper) -> dict:
         })
 
         result["success"] = True
-        logger.info("Successfully ingested video: %s", metadata.get("title", video_id))
+        logger.info("Successfully processed video: %s", metadata.get("title", video_id))
 
     except Exception as exc:
         result["error"] = str(exc)
-        logger.error("Failed to ingest video %s: %s", video_url, exc, exc_info=True)
+        logger.error("Failed to process video %s: %s", video_url, exc, exc_info=True)
 
     return result
 
