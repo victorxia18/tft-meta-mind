@@ -171,7 +171,7 @@ class TFTChatbot:
             contents=contents,
             config={
                 "system_instruction": self.build_system_prompt(),
-                "max_output_tokens": 1024,
+                "max_output_tokens": 4096,
             },
         )
 
