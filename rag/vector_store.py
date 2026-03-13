@@ -29,22 +29,63 @@ class TFTVectorStore:
             metadata={"description": "TFT meta knowledge base"},
         )
 
-    def _chunk_by_sections(self, text: str) -> list[str]:
-        """Split text on '## ' headers so each comp/unit stays in one chunk.
+    # Chunks beyond this character count get sub-chunked on ### headers
+    MAX_CHUNK_CHARS = 1500
 
+    def _chunk_by_sections(self, text: str) -> list[str]:
+        """Split text on '## ' headers, then sub-split oversized chunks on '### '.
+
+        Keeps each comp/unit together when possible, but breaks apart very large
+        sections so they stay within the embedding model's effective context window.
         Falls back to the full text as a single chunk if no headers found.
         """
-        chunks = []
+        # First pass: split on ## headers
+        raw_chunks = []
         current = ""
 
         for line in text.split("\n"):
             if line.startswith("## ") and current.strip():
-                chunks.append(current.strip())
+                raw_chunks.append(current.strip())
                 current = ""
             current += line + "\n"
 
         if current.strip():
-            chunks.append(current.strip())
+            raw_chunks.append(current.strip())
+
+        # Second pass: sub-split oversized chunks on ### headers
+        chunks = []
+        for chunk in raw_chunks:
+            if len(chunk) <= self.MAX_CHUNK_CHARS:
+                chunks.append(chunk)
+                continue
+
+            # Try splitting on ### headers
+            section_header = ""
+            sub_chunks = []
+            sub_current = ""
+
+            for line in chunk.split("\n"):
+                # Capture the ## header to prepend to sub-chunks for context
+                if line.startswith("## "):
+                    section_header = line
+                    sub_current += line + "\n"
+                    continue
+
+                if line.startswith("### ") and sub_current.strip():
+                    sub_chunks.append(sub_current.strip())
+                    # Prepend section header to each sub-chunk for context
+                    sub_current = section_header + "\n\n" if section_header else ""
+
+                sub_current += line + "\n"
+
+            if sub_current.strip():
+                sub_chunks.append(sub_current.strip())
+
+            # Only use sub-chunks if splitting actually helped
+            if len(sub_chunks) > 1:
+                chunks.extend(sub_chunks)
+            else:
+                chunks.append(chunk)
 
         return chunks
 
@@ -65,9 +106,11 @@ class TFTVectorStore:
         metadatas = []
 
         for i, chunk in enumerate(chunks):
-            # Deterministic ID from type + date + chunk index
+            # Deterministic ID from type + date + source_id + chunk index
             # Re-running ingestion will upsert (update) instead of duplicate
-            raw_id = f"{base_metadata.get('type', '')}_{base_metadata.get('date', '')}_{i}"
+            # Include video_id (if present) so multiple videos on the same date don't collide
+            source_id = base_metadata.get("video_id", "")
+            raw_id = f"{base_metadata.get('type', '')}_{base_metadata.get('date', '')}_{source_id}_{i}"
             chunk_id = hashlib.md5(raw_id.encode()).hexdigest()
 
             ids.append(chunk_id)
