@@ -20,6 +20,8 @@ load_dotenv()
 from chatbot.app import TFTChatbot
 from pipeline.document_generator import TFTDocumentGenerator
 from rag.vector_store import TFTVectorStore
+from ui.components import render_header, render_welcome
+from ui.styles import CUSTOM_CSS
 from utils.data_dragon import DataDragon
 
 WELCOME_MESSAGE = (
@@ -35,124 +37,9 @@ STARTER_QUESTIONS = [
     "What comps are most consistent for top 4?",
 ]
 
-# ── Custom CSS ──────────────────────────────────────────
+PENGU_ICON = "assets/pengu_knight.png"
 
-CUSTOM_CSS = """
-<style>
-/* Accent bar at top */
-.stApp::before {
-    content: "";
-    display: block;
-    width: 100%;
-    height: 4px;
-    background: linear-gradient(90deg, #C89B3C 0%, #0AC8B9 50%, #C89B3C 100%);
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 9999;
-}
 
-/* Hide default footer and hamburger */
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-
-/* Sidebar styling */
-section[data-testid="stSidebar"] {
-    background-color: #0e1117;
-}
-section[data-testid="stSidebar"] .stMarkdown {
-    color: #c9d1d9;
-}
-
-/* Chat message styling */
-.stChatMessage[data-testid="chat-message-assistant"] {
-    background-color: #e8f4f8;
-    border-radius: 12px;
-    padding: 4px 8px;
-}
-.stChatMessage[data-testid="chat-message-user"] {
-    background-color: #f0f0f0;
-    border-radius: 12px;
-    padding: 4px 8px;
-}
-
-/* Larger chat text */
-.stChatMessage p {
-    font-size: 1.05rem;
-    line-height: 1.6;
-}
-
-/* Stat card styling */
-div[data-testid="stMetric"] {
-    background-color: #f8f9fa;
-    border: 1px solid #e1e4e8;
-    border-radius: 12px;
-    padding: 16px 20px;
-    text-align: center;
-}
-div[data-testid="stMetric"] label {
-    color: #6c757d;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-    color: #0AC8B9;
-    font-size: 2rem;
-    font-weight: 700;
-}
-
-/* Starter question buttons — pill style */
-.starter-btn button {
-    border-radius: 20px !important;
-    border: 1px solid #C89B3C !important;
-    color: #C89B3C !important;
-    background-color: transparent !important;
-    font-size: 0.9rem !important;
-    padding: 6px 18px !important;
-    white-space: nowrap !important;
-    transition: all 0.2s ease !important;
-}
-.starter-btn button:hover {
-    background-color: #C89B3C !important;
-    color: #fff !important;
-}
-
-/* Title styling */
-.main-title {
-    font-size: 2.2rem;
-    font-weight: 800;
-    color: #C89B3C;
-    margin-bottom: 0;
-    line-height: 1.2;
-}
-.subtitle {
-    font-size: 1.05rem;
-    color: #8b949e;
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-}
-
-/* Sidebar section headers */
-.sidebar-header {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #C89B3C;
-    font-weight: 600;
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-/* Powered-by text */
-.powered-by {
-    font-size: 0.75rem;
-    color: #6c757d;
-    line-height: 1.5;
-}
-</style>
-"""
 
 
 @st.cache_resource
@@ -236,7 +123,7 @@ def process_question(question: str):
     for msg in st.session_state.messages[:-1]:
         chat_history.append({"role": msg["role"], "content": msg["content"]})
 
-    with st.chat_message("assistant", avatar="🧠"):
+    with st.chat_message("assistant", avatar=PENGU_ICON):
         with st.spinner("Searching TFT knowledge base..."):
             response = bot.ask(
                 question,
@@ -251,7 +138,7 @@ def process_question(question: str):
 
 st.set_page_config(
     page_title="TFT Meta Mind",
-    page_icon="🧠",
+    page_icon=PENGU_ICON,
     layout="wide",
 )
 
@@ -265,18 +152,19 @@ scrape_date = get_latest_scrape_date()
 video_count = get_youtube_video_count()
 
 with st.sidebar:
-    st.markdown("# 🧠 TFT Meta Mind")
+    st.image(PENGU_ICON, width=40)
+    st.markdown("# TFT Meta Mind")
 
     # Data Sources section
     st.markdown('<p class="sidebar-header">Data Sources</p>', unsafe_allow_html=True)
 
     if scrape_date:
-        st.markdown(f"📊 **Last scrape:** {scrape_date}")
+        st.markdown(f"**Last scrape:** {scrape_date}")
     else:
         st.warning("No scraped data found.")
 
-    st.markdown(f"📹 **Videos ingested:** {video_count}")
-    st.markdown(f"🧩 **Knowledge chunks:** {stats['total_chunks']}")
+    st.markdown(f"**Videos ingested:** {video_count}")
+    st.markdown(f"**Knowledge chunks:** {stats['total_chunks']}")
 
     st.markdown("---")
 
@@ -295,6 +183,50 @@ with st.sidebar:
                 st.caption(f"[{title}]({url})\n{channel}")
 
     st.markdown("---")
+
+    # Document review section
+    with st.expander("📝 Review YouTube Docs"):
+        yt_docs_dir = Path("data/youtube_docs")
+        yt_files = sorted(yt_docs_dir.glob("*.json")) if yt_docs_dir.exists() else []
+        if not yt_files:
+            st.caption("No YouTube docs found.")
+        else:
+            # Build display labels from metadata
+            doc_labels = {}
+            for fp in yt_files:
+                try:
+                    meta = json.load(open(fp, encoding="utf-8")).get("metadata", {})
+                    label = meta.get("video_title", fp.stem)
+                except (json.JSONDecodeError, OSError):
+                    label = fp.stem
+                doc_labels[fp.name] = label
+
+            selected_file = st.selectbox(
+                "Select document",
+                options=list(doc_labels.keys()),
+                format_func=lambda x: doc_labels[x],
+                key="review_doc_select",
+            )
+
+            if selected_file:
+                doc_path = yt_docs_dir / selected_file
+                doc_data = json.load(open(doc_path, encoding="utf-8"))
+                original_text = doc_data.get("text", "")
+
+                edited_text = st.text_area(
+                    "Document text (Markdown — chunked by `## ` headers on ingestion)",
+                    value=original_text,
+                    height=400,
+                    key="review_doc_text",
+                )
+
+                if edited_text != original_text:
+                    if st.button("Save changes", key="review_doc_save"):
+                        doc_data["text"] = edited_text
+                        with open(doc_path, "w", encoding="utf-8") as f:
+                            json.dump(doc_data, f, indent=2, ensure_ascii=False)
+                        st.success("Saved. Re-ingest to update the knowledge base.")
+                        st.rerun()
 
     # Admin section
     with st.expander("⚙️ Admin Tools"):
@@ -341,11 +273,7 @@ if stats["total_chunks"] == 0:
 
 # ── Header ───────────────────────────────────────────────
 
-st.markdown('<p class="main-title">TFT Meta Mind</p>', unsafe_allow_html=True)
-st.markdown(
-    '<p class="subtitle">AI-powered TFT meta analyst — powered by real-time data</p>',
-    unsafe_allow_html=True,
-)
+st.markdown(render_header(), unsafe_allow_html=True)
 
 # Stat cards
 comp_count, unit_count = get_comp_and_unit_counts()
@@ -364,14 +292,14 @@ if "messages" not in st.session_state:
 
 # Display conversation history
 for msg in st.session_state.messages:
-    avatar = "🧠" if msg["role"] == "assistant" else None
+    avatar = PENGU_ICON if msg["role"] == "assistant" else None
     with st.chat_message(msg["role"], avatar=avatar):
         st.write(msg["content"])
 
 # Welcome message and starter questions (only when no messages yet)
 if not st.session_state.messages:
-    with st.chat_message("assistant", avatar="🧠"):
-        st.write(WELCOME_MESSAGE)
+    with st.chat_message("assistant", avatar=PENGU_ICON):
+        st.markdown(render_welcome(), unsafe_allow_html=True)
 
     cols = st.columns(len(STARTER_QUESTIONS))
     for i, question in enumerate(STARTER_QUESTIONS):

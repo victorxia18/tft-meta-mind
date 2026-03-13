@@ -260,7 +260,7 @@ class TFTYouTubeScraper:
             model="gemini-2.5-flash",
             contents=prompt,
             config={
-                "max_output_tokens": 4096,
+                "max_output_tokens": 16384,
             },
         )
 
