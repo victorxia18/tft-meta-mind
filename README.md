@@ -7,7 +7,8 @@
 [![Deployed](https://img.shields.io/badge/status-deployed-brightgreen)](https://tftmetamind.duckdns.org)
 
 ![TFT Meta Mind Screenshot](docs/screenshot.png)
-<!-- TODO: Add actual screenshot -->
+<img width="2557" height="1390" alt="image" src="https://github.com/user-attachments/assets/066204b7-7f45-4d2c-94c2-f6861dc27621" />
+
 
 ---
 
