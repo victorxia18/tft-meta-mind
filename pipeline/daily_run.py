@@ -544,7 +544,6 @@ def _ingest_youtube_urls(urls: list[str]) -> dict:
         {"success": bool, "processed": int, "skipped": int, "error": str|None}
     """
     import os
-    import re
     import time as _time
 
     from dotenv import load_dotenv
