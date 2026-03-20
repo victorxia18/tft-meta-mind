@@ -455,7 +455,6 @@ tft-meta-mind/
 | `playwright` | >= 1.40.0 | Browser automation for tactics.tools scraping |
 | `youtube-transcript-api` | >= 1.0.0 | YouTube transcript fetching |
 | `requests` | >= 2.31.0 | HTTP client (Data Dragon, YouTube metadata) |
-| `beautifulsoup4` | >= 4.12.0 | HTML parsing |
 | `apscheduler` | >= 3.10.0 | Cron-like scheduling for daily pipeline |
 | `python-dotenv` | >= 1.0.0 | Environment variable loading |
 
