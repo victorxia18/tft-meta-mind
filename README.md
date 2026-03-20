@@ -1,21 +1,22 @@
-# 🧠 TFT Meta Mind
+# TFT Meta Mind
 
-**An AI-powered Teamfight Tactics meta analyst that combines real-time stats, YouTube creator insights, and RAG to answer any TFT question.**
+**A RAG chatbot that knows the current Teamfight Tactics meta — backed by daily-scraped stats and YouTube creator insights.**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Deployed](https://img.shields.io/badge/status-deployed-brightgreen)](https://tftmetamind.duckdns.org)
+[![Deployed](https://img.shields.io/badge/live-tftmetamind.duckdns.org-brightgreen)](https://tftmetamind.duckdns.org)
 
 <img width="2557" height="1390" alt="TFT Meta Mind Screenshot" src="https://github.com/user-attachments/assets/066204b7-7f45-4d2c-94c2-f6861dc27621" />
 
-
 ---
 
-## What It Does
+## Why This Exists
 
-TFT Meta Mind is a **RAG chatbot** that knows the current TFT meta. It combines daily-scraped stats from [tactics.tools](https://tactics.tools), strategic advice extracted from YouTube creator videos, and semantic search to give grounded, actionable answers.
+Most TFT tier lists are static images that go stale within a day. Players need up-to-date, specific answers: *"What items on Yone?"*, *"Is this comp still good after the hotfix?"*, *"How do I transition from a Mage opener?"*
 
-Ask it what comps are strong, how to itemize a unit, or what to play from a specific opener — and get answers backed by real data and pro player insights.
+TFT Meta Mind solves this by combining a **daily automated data pipeline** (scraping high-elo stats from [tactics.tools](https://tactics.tools) and extracting strategy from YouTube creators) with a **RAG chatbot** (Gemini 2.5 Flash + ChromaDB) that can answer those questions with grounded, citation-backed responses.
+
+The interesting engineering problem is making retrieval smart enough to route different question types to the right knowledge — comp questions need stats, strategy questions need creator advice, and unit questions need item builds. A keyword classifier + metadata-filtered vector search handles this without fine-tuning.
 
 ---
 
@@ -53,16 +54,9 @@ flowchart LR
     GM -->|Answer| UI
 ```
 
----
+**Data flows through five daily pipeline steps:** scrape tactics.tools via Playwright → generate natural-language documents → ingest into ChromaDB with header-based chunking → ingest pre-processed YouTube docs → clean up old files. The chatbot classifies incoming questions (comp / unit / strategy / ambiguous) and routes retrieval to the most relevant document types before generating a grounded answer.
 
-## Key Features
-
-- **Daily automated meta scraping** from tactics.tools via Playwright
-- **YouTube transcript ingestion** with LLM-powered strategic insight extraction
-- **Semantic search** over a TFT knowledge base (ChromaDB vector store)
-- **Smart retrieval routing** — comp questions, unit questions, and strategy questions each get tailored context
-- **Deployed on AWS Lightsail** with Docker Compose + GitHub Actions CI/CD
-- **Multi-turn conversation** with context-aware follow-ups
+For the full technical deep-dive, see [`tft_meta_mind_blueprint.md`](tft_meta_mind_blueprint.md).
 
 ---
 
@@ -71,32 +65,53 @@ flowchart LR
 | Category | Technology |
 |----------|-----------|
 | **AI / LLM** | Gemini 2.5 Flash (google-genai) |
-| **Vector DB** | ChromaDB |
-| **Scraping** | Playwright, youtube-transcript-api |
+| **Vector DB** | ChromaDB (all-MiniLM-L6-v2 embeddings) |
+| **Scraping** | Playwright (headless Chromium), youtube-transcript-api |
 | **Frontend** | Streamlit |
-| **Deployment** | AWS Lightsail, Docker Compose, GitHub Actions |
-| **Data Sources** | Riot Games Data Dragon, tactics.tools, YouTube |
+| **Deployment** | AWS Lightsail, Docker Compose, GitHub Actions CI/CD |
+| **Data Sources** | Riot Data Dragon CDN, tactics.tools, YouTube |
 
 ---
 
 ## Getting Started
 
+### Prerequisites
+
+- Python 3.11+
+- A [Google AI Studio](https://aistudio.google.com/) API key (Gemini)
+
+### Setup
+
 ```bash
-# Clone and setup
 git clone https://github.com/victorxia18/tft-meta-mind.git
 cd tft-meta-mind
 python -m venv .venv && source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 pip install -r requirements.txt
 playwright install chromium
+```
 
-# Configure environment
-cp .env.example .env  # Add your GEMINI_API_KEY
+### Configure environment
 
-# Run the pipeline (scrape + generate docs + ingest)
+```bash
+cp .env.example .env
+# Edit .env and add your GEMINI_API_KEY
+```
+
+### Run the pipeline and UI
+
+```bash
+# Scrape data + generate docs + ingest into vector store
 python -m pipeline.daily_run --once
 
-# Launch the UI
+# Launch the web UI
 streamlit run streamlit_app.py
+```
+
+### Optional: ingest YouTube videos
+
+```bash
+# Process YouTube videos locally (transcripts are blocked from cloud IPs)
+python -m pipeline.daily_run --youtube-file config/youtube_sources.txt
 ```
 
 ---
@@ -105,39 +120,44 @@ streamlit run streamlit_app.py
 
 ```
 tft-meta-mind/
-├── chatbot/            # Gemini RAG chatbot with smart retrieval routing
-├── scraper/            # Playwright scraper + YouTube transcript fetcher
-├── pipeline/           # Daily orchestration (APScheduler) + document generator
-├── rag/                # ChromaDB vector store wrapper
-├── utils/              # Riot Data Dragon CDN lookups (ID → name)
-├── config/             # YouTube source URLs
+├── chatbot/app.py              # Gemini RAG chatbot with keyword-based retrieval routing
+├── scraper/
+│   ├── tactics_tools.py        # Playwright scraper (Next.js __NEXT_DATA__ extraction)
+│   └── youtube.py              # YouTube transcript fetch + Gemini strategy extraction
+├── pipeline/
+│   ├── daily_run.py            # 5-step pipeline orchestrator (APScheduler)
+│   └── document_generator.py   # Raw JSON → natural language docs for RAG
+├── rag/vector_store.py         # ChromaDB wrapper (## header chunking, deterministic IDs)
+├── ui/
+│   ├── components.py           # HTML renderers (header, welcome message)
+│   └── styles.py               # Custom CSS theme
+├── utils/data_dragon.py        # Riot Data Dragon CDN (ID → champion/item/trait names)
+├── config/youtube_sources.txt  # YouTube URLs for batch ingestion
 ├── data/
-│   ├── raw/            # Scraped JSON data (gitignored)
-│   └── youtube_docs/   # Pre-processed YouTube documents (git-tracked)
-├── streamlit_app.py    # Web UI entry point
-├── docker-compose.yml  # Multi-container deployment config
-└── .github/workflows/  # CI/CD pipeline
+│   ├── raw/                    # Scraped JSON (gitignored, auto-cleaned after 7 days)
+│   └── youtube_docs/           # Pre-processed YouTube documents (git-tracked)
+├── streamlit_app.py            # Web UI entry point
+├── docker-compose.yml          # Two-container deployment (streamlit + pipeline)
+├── Dockerfile
+└── .github/workflows/deploy.yml
 ```
 
 ---
 
-## How It Works
+## Key Design Decisions
 
-**Data Collection:** A daily pipeline scrapes comp and unit statistics from tactics.tools using Playwright. YouTube creator videos are processed locally — transcripts are fetched, then Gemini extracts strategic insights (opener guides, transition paths, itemization advice) into structured documents.
-
-**Knowledge Storage:** All documents are chunked by section (one comp or unit per chunk) and embedded into ChromaDB. Deterministic IDs ensure re-running the pipeline updates existing data rather than creating duplicates.
-
-**RAG Retrieval:** When a user asks a question, the system classifies it (comp question? unit question? strategy question?) and routes retrieval accordingly — pulling from the most relevant document types. Gemini then generates an answer grounded in the retrieved context, citing specific stats and creator sources.
-
-For the full technical spec, see [`tft_meta_mind_blueprint.md`](tft_meta_mind_blueprint.md).
+- **Header-based chunking** — documents split on `## ` markdown headers to keep each comp/unit as a single semantic chunk, with sub-splitting on `### ` for oversized sections. Produces better retrieval than arbitrary word-count splits.
+- **Keyword routing** — regex classifiers detect question intent and filter retrieval by document type before embedding similarity kicks in. Pure similarity struggled with obvious-intent questions like *"what items on Fizz"*.
+- **Deterministic chunk IDs** — `MD5(type_date_sourceId_index)` means re-running the pipeline upserts instead of duplicating. Safe to re-run at any time.
+- **Two-stage YouTube pipeline** — YouTube blocks transcript API from cloud IPs, so video processing runs locally, saves JSON to `data/youtube_docs/`, and the server-side pipeline just ingests the files.
 
 ---
 
 ## Future Plans
 
-- 🐦 **Twitter/X meta signal ingestion** — track what top players are saying about the meta in real-time
-- 📊 **Personal match history tracking** via Riot API — get personalized advice based on your recent games
-- 🔔 **Meta shift detection and alerts** — get notified when comp win rates change significantly between patches
+- **Twitter/X meta signal ingestion** — track what top players are saying about the meta in real-time
+- **Personal match history tracking** via Riot API — personalized advice based on your recent games
+- **Meta shift detection and alerts** — notifications when comp win rates change significantly between patches
 
 ---
 

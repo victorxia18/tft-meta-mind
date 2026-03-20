@@ -1,10 +1,33 @@
+# Environment & secrets
 .env
-.claude/
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+
+# Project data (runtime-generated)
 chroma_db/
 data/raw/
 data/youtube_videos.json
 logs/
-__pycache__/
-.venv/
-*.pyc
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+
+# Misc
+excalidraw.log
