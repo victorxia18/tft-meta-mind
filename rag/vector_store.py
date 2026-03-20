@@ -170,6 +170,38 @@ class TFTVectorStore:
         """Return collection statistics."""
         return {"total_chunks": self.collection.count()}
 
+    def get_all_metadata(self) -> list[dict]:
+        """Return metadata for every chunk in the collection."""
+        count = self.collection.count()
+        if count == 0:
+            return []
+        result = self.collection.get(include=["metadatas"])
+        return result["metadatas"]
+
+    def get_chunks_by_filter(
+        self, where: dict, include_documents: bool = False
+    ) -> dict:
+        """Return chunk IDs (and optionally text) matching a metadata filter."""
+        include = ["metadatas"]
+        if include_documents:
+            include.append("documents")
+        result = self.collection.get(where=where, include=include)
+        return result
+
+    def delete_by_filter(self, where: dict) -> int:
+        """Delete all chunks matching a metadata filter. Returns count deleted."""
+        result = self.collection.get(where=where, include=[])
+        ids = result["ids"]
+        if ids:
+            self.collection.delete(ids=ids)
+        return len(ids)
+
+    def delete_by_ids(self, ids: list[str]) -> int:
+        """Delete chunks by their IDs. Returns count deleted."""
+        if ids:
+            self.collection.delete(ids=ids)
+        return len(ids)
+
 
 if __name__ == "__main__":
     import sys
