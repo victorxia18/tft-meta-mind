@@ -201,6 +201,17 @@ def _step_generate_and_ingest(scrape_path: Path | None = None) -> dict:
         for doc in documents:
             store.ingest_document(doc)
 
+        # Delete old scraped chunks (keep only today's data)
+        # Done after ingestion so we never lose all scraped data on failure
+        old_deleted = store.delete_by_filter({
+            "$and": [
+                {"type": {"$in": ["meta_snapshot", "unit_analysis"]}},
+                {"date": {"$ne": today}},
+            ]
+        })
+        if old_deleted:
+            logger.info("Deleted %d old scraped chunks (pre-%s)", old_deleted, today)
+
         stats = store.get_stats()
         result["total_chunks"] = stats["total_chunks"]
         result["success"] = True
@@ -544,7 +555,6 @@ def _ingest_youtube_urls(urls: list[str]) -> dict:
         {"success": bool, "processed": int, "skipped": int, "error": str|None}
     """
     import os
-    import re
     import time as _time
 
     from dotenv import load_dotenv
