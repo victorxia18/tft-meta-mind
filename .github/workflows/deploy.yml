@@ -18,7 +18,8 @@ jobs:
             set -e
 
             cd ~/tft-project
-            git pull origin master
+            git fetch origin master
+            git reset --hard origin/master
 
             # Write .env from secrets
             cat > .env << 'ENVEOF'
