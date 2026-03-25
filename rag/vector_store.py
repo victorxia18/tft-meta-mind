@@ -154,7 +154,24 @@ class TFTVectorStore:
         if kwargs["n_results"] == 0:
             return []
 
-        results = self.collection.query(**kwargs)
+        try:
+            results = self.collection.query(**kwargs)
+        except Exception as e:
+            if where:
+                # Filtered query failed (likely index/metadata desync) — retry without filter
+                logger.warning(
+                    "Filtered query failed (%s), retrying without filter: %s",
+                    where, e,
+                )
+                kwargs.pop("where")
+                try:
+                    results = self.collection.query(**kwargs)
+                except Exception:
+                    logger.error("Query failed even without filter: %s", e)
+                    return []
+            else:
+                logger.error("Query failed: %s", e)
+                return []
 
         output = []
         for i in range(len(results["documents"][0])):
@@ -201,6 +218,17 @@ class TFTVectorStore:
         if ids:
             self.collection.delete(ids=ids)
         return len(ids)
+
+    def reset_collection(self):
+        """Delete and recreate the collection. Use when the index is corrupted."""
+        logger.warning("Resetting collection 'tft_knowledge' due to corruption")
+        self.client.delete_collection("tft_knowledge")
+        self.collection = self.client.get_or_create_collection(
+            name="tft_knowledge",
+            embedding_function=self.embedding_fn,
+            metadata={"description": "TFT meta knowledge base"},
+        )
+        logger.info("Collection reset complete — re-ingestion required")
 
 
 if __name__ == "__main__":
