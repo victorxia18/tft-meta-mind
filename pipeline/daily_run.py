@@ -201,6 +201,9 @@ def _step_generate_and_ingest(scrape_path: Path | None = None) -> dict:
         for doc in documents:
             store.ingest_document(doc)
 
+        # Verify the index is healthy with a test query
+        store.query("test", n_results=1)
+
         stats = store.get_stats()
         result["total_chunks"] = stats["total_chunks"]
         result["success"] = True
@@ -209,8 +212,21 @@ def _step_generate_and_ingest(scrape_path: Path | None = None) -> dict:
             time.time() - t0, result["total_chunks"],
         )
     except Exception as exc:
-        result["error"] = f"ChromaDB ingestion failed: {exc}"
-        logger.error(result["error"], exc_info=True)
+        logger.warning("ChromaDB error detected, resetting collection and retrying: %s", exc)
+        try:
+            store.reset_collection()
+            for doc in documents:
+                store.ingest_document(doc)
+            stats = store.get_stats()
+            result["total_chunks"] = stats["total_chunks"]
+            result["success"] = True
+            logger.info(
+                "Ingestion recovered after reset — %d total chunks",
+                result["total_chunks"],
+            )
+        except Exception as retry_exc:
+            result["error"] = f"ChromaDB ingestion failed even after reset: {retry_exc}"
+            logger.error(result["error"], exc_info=True)
 
     return result
 
