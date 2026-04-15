@@ -275,6 +275,12 @@ if stats["total_chunks"] == 0:
 
 st.markdown(render_header(), unsafe_allow_html=True)
 
+st.warning(
+    "🚧 **Under maintenance (as of 2026-04-15):** "
+    "TFT Set 17 is dropping — data pipelines are being updated for the new set. "
+    "Some meta insights may be stale or incomplete until the transition is complete."
+)
+
 # Stat cards
 comp_count, unit_count = get_comp_and_unit_counts()
 col1, col2, col3, col4 = st.columns(4)
