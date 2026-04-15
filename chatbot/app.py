@@ -67,8 +67,7 @@ class TFTChatbot:
             "5. When discussing units, mention their best items and 3-star potential "
             "if that data exists in the context.\n"
             "6. Use TFT language: 'top 4' = good result, 'first' = win, 'bot 4' = bad result.\n"
-            "7. Do NOT mention augments — we do not have augment data.\n"
-            "8. Keep answers concise but informative. Players want quick, actionable info."
+            "7. Keep answers concise but informative. Players want quick, actionable info."
         )
 
     def _retrieve(self, question: str, n_results: int = 5) -> list[dict]:
