@@ -16,7 +16,9 @@ DDRAGON_BASE = "https://ddragon.leagueoflegends.com"
 
 # Manual overrides for special unit IDs that Data Dragon doesn't resolve.
 MANUAL_CHAMPION_OVERRIDES = {
-    "TFT16_AnnieTibbers": "Annie & Tibbers",
+    "TFT17_Reksai": "Rek'Sai",
+    # Old set - kept for reference
+    # "TFT16_AnnieTibbers": "Annie & Tibbers",
 }
 
 
@@ -119,7 +121,7 @@ if __name__ == "__main__":
 
     # Sample champion lookups
     print("\n--- Champion Lookups ---")
-    for cid in ["TFT16_Fizz", "TFT16_ChoGath", "TFT16_Malzahar", "TFT16_Zoe", "TFT16_AnnieTibbers", "FakeChamp123"]:
+    for cid in ["TFT17_Briar", "TFT17_Belveth", "TFT17_MissFortune", "TFT17_Akali", "TFT17_Bard", "FakeChamp123"]:
         print(f"  {cid} -> {dd.champion_name(cid)} (cost {dd.champion_cost(cid)})")
 
     # Sample item lookups
@@ -129,5 +131,5 @@ if __name__ == "__main__":
 
     # Sample trait lookups
     print("\n--- Trait Lookups ---")
-    for tid in ["TFT16_Void", "TFT16_Magus", "TFT16_Warden", "FakeTrait"]:
+    for tid in ["TFT17_Void", "TFT17_Magus", "TFT17_Warden", "FakeTrait"]:
         print(f"  {tid} -> {dd.trait_name(tid)}")
