@@ -32,7 +32,7 @@ WELCOME_MESSAGE = (
 
 STARTER_QUESTIONS = [
     "What are the strongest comps right now?",
-    "What items should I build on Yone?",
+    "What items should I build on Riven?",
     "Which units are S-tier this patch?",
     "What comps are most consistent for top 4?",
 ]
