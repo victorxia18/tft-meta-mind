@@ -12,6 +12,7 @@ import logging
 from typing import Optional
 
 import chromadb
+from chromadb.errors import NotFoundError
 from chromadb.utils import embedding_functions
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,15 @@ class TFTVectorStore:
         )
         print(f"Ingested {len(chunks)} chunks from {base_metadata.get('type', 'unknown')}")
 
+    def _refresh_collection(self):
+        """Re-fetch collection reference when the stored UUID becomes stale."""
+        logger.warning("Collection reference stale — re-fetching from client")
+        self.collection = self.client.get_or_create_collection(
+            name="tft_knowledge",
+            embedding_function=self.embedding_fn,
+            metadata={"description": "TFT meta knowledge base"},
+        )
+
     def query(
         self,
         question: str,
@@ -144,9 +154,15 @@ class TFTVectorStore:
         Returns:
             List of {"text": str, "metadata": dict, "distance": float}.
         """
+        try:
+            current_count = self.collection.count()
+        except NotFoundError:
+            self._refresh_collection()
+            current_count = self.collection.count()
+
         kwargs = {
             "query_texts": [question],
-            "n_results": min(n_results, self.collection.count()),
+            "n_results": min(n_results, current_count),
         }
         if where:
             kwargs["where"] = where
@@ -185,11 +201,19 @@ class TFTVectorStore:
 
     def get_stats(self) -> dict:
         """Return collection statistics."""
-        return {"total_chunks": self.collection.count()}
+        try:
+            return {"total_chunks": self.collection.count()}
+        except NotFoundError:
+            self._refresh_collection()
+            return {"total_chunks": self.collection.count()}
 
     def get_all_metadata(self) -> list[dict]:
         """Return metadata for every chunk in the collection."""
-        count = self.collection.count()
+        try:
+            count = self.collection.count()
+        except NotFoundError:
+            self._refresh_collection()
+            count = self.collection.count()
         if count == 0:
             return []
         result = self.collection.get(include=["metadatas"])
