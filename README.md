@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Deployed](https://img.shields.io/badge/live-tftmetamind.duckdns.org-brightgreen)](https://tftmetamind.duckdns.org)
 
-<video src="assets/demo.mp4" controls width="100%"></video>
+<video src="https://github.com/user-attachments/assets/e9713a6c-fc1b-40d5-8fc3-73f8487dcec0" controls width="100%"></video>
 
 ---
 
